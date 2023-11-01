@@ -1,18 +1,15 @@
-/*
-    In this code:
+;----------------------------------------------
+;   R8 is initialized as the current number (starting from 1).
 
-    R8 is initialized as the current number (starting from 1).
+;   R9 is used to keep track of the count of divisible numbers.
 
-    R9 is used to keep track of the count of divisible numbers.
+;   The findNumbers loop checks if the current number is divisible by 3 or 4 using the modulus operation 
+;   and stores it in the array if it is.
 
-    The findNumbers loop checks if the current number is divisible by 3 or 4 using the modulus operation 
-    and stores it in the array if it is.
+;   This code will populate the arr array with the first 50 positive numbers that are divisible by either 3 or 4. 
 
-    This code will populate the arr array with the first 50 positive numbers that are divisible by either 3 or 4. 
-
-    You can modify the code to use a different array size or to store the numbers in a different memory location if needed.
-*/
-
+;   You can modify the code to use a different array size or to store the numbers in a different memory location if needed.
+;----------------------------------------------
 
 ; Initialize registers
 main        mov.w #arr, R10 ; Set R10 to the address of the array
