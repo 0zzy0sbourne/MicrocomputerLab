@@ -1,42 +1,32 @@
-; Define ports and registers
-PORT_DISPLAY equ 0x01 ; Address of the port connected to 7-segment displays
+;--------------------------------------
+; BCD Conversion Subroutine. 
+; Subroutine that takes a binary input between 0x00000000b and 0x01100011b and converts it to two decimal digits. 
+; The result will be displayed on the 7-segment displays.
+;------------------------------------
 
-ORG 0x0000 ; Start address of the program
 
-Main
-    mov R3, #0 ; Initialize register R3 to store the BCD result
+BCDConversion
+    ; Input: R12 - Binary input
+    ; Output: R13 - BCD result (tens digit), R14 - BCD result (ones digit)
 
-    ; Binary input value (adjust this value as needed)
-    mov R0, #97 ; Example: binary input of 97
+    ; Extract the tens digit
+    mov.w R12, R13          ; Copy the binary input to R13
+    rla R13                 ; Rotate left through carry
+    rla R13                 ; Rotate left through carry (multiply by 4)
+    rla R13                 ; Rotate left through carry (multiply by 8)
+    rla R13                 ; Rotate left through carry (multiply by 16)
+    
+    ; Extract the ones digit
+    mov.w R12, R14          ; Copy the binary input to R14
+    and #000Fh, R14         ; Mask the lower nibble (ones digit)
 
-    ; Call BCD conversion subroutine
-    call BCDConvert
+    ; Convert the ones digit to BCD
+    add #3, R14             ; Add 3 (to adjust for binary to BCD conversion)
+    daa                     ; Decimal adjust after addition
 
-    ; Display the BCD result on 7-segment displays
-    mov [PORT_DISPLAY], R3 ; Output the tens digit
-    call Delay ; Introduce a delay
-    mov [PORT_DISPLAY], R4 ; Output the ones digit
+    ; Convert the tens digit to BCD
+    add #3, R13             ; Add 3 (to adjust for binary to BCD conversion)
+    daa                     ; Decimal adjust after addition
 
-    ; Infinite loop
-    jmp Main
-
-; BCD conversion subroutine
-BCDConvert
-    mov R4, R0 ; Copy the binary input to R4
-    mov R3, #0 ; Clear R3 for the tens digit
-
-    ; Convert tens digit
-    BCDLoop
-        cmp R4, #10 ; Compare R4 with 10
-        jl BCDDone ; If R4 is less than 10, exit the loop
-
-        sub R4, #10 ; Subtract 10 from R4
-        inc R3 ; Increment the tens digit
-        jmp BCDLoop ; Repeat the loop
-
-    BCDDone
-        ret ; Return from the subroutine
-
-Delay
-    ; Delay subroutine goes here
-    ret ; Placeholder return
+    ; Result is in R13 (tens digit) and R14 (ones digit)
+    ret

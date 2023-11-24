@@ -1,42 +1,74 @@
-; Define ports and registers
-PORT_DISPLAY equ 0x0200 ; Address of the port connected to 7-segment displays
+.data
+array         .byte 00111111b, 00000110b, 01011011b, 01001111b, 01100110b, 01101101b, 01111101b, 00000111b, 01111111b, 01101111b
+lastElement
+seconds       .word 0
+centiseconds  .word 0
 
-; Timer A registers
-TA0CTL equ 0x0160 ; Timer A0 Control
-TA0CCR0 equ 0x0172 ; Timer A0 Capture/Compare 0
-TA0CCTL0 equ 0x0162 ; Timer A0 Capture/Compare Control 0
+.text
 
-            ORG 0x0000 ; Start address of the program
+; ... (existing code goes here)
 
-; Initialize the main program
-Main        mov.w #WDTCTL, R2 ; Disable Watchdog Timer
-            mov.w #WDTPW | WDTHOLD, R3
-            mov.w #PORT_DISPLAY, R4 ; Address of the display port
-            mov.w #0, R5 ; Clear register R5 for the BCD result
+BCDConversion
+    ; Input: R12 - Binary input
+    ; Output: R13 - BCD result (tens digit), R14 - BCD result (ones digit)
 
-            ; Configure Timer A
-            mov.w #TA0CTL, R6 ; Load the address of Timer A0 Control register
-            mov.w #TASSEL_2 | MC_1 | ID_3, 0(R6) ; Set SMCLK as source, Up mode, and divide by 8
+    ; Extract the tens digit
+    mov.w R12, R13          ; Copy the binary input to R13
+    rla R13                 ; Rotate left through carry
+    rla R13                 ; Rotate left through carry (multiply by 4)
+    rla R13                 ; Rotate left through carry (multiply by 8)
+    rla R13                 ; Rotate left through carry (multiply by 16)
+    
+    ; Extract the ones digit
+    mov.w R12, R14          ; Copy the binary input to R14
+    and #000Fh, R14         ; Mask the lower nibble (ones digit)
 
-            mov.w #TA0CCR0, R7 ; Load the address of Timer A0 CCR0 register
-            mov.w #10486, 0(R7) ; Set the value for 10 ms interrupt (10486 for 1 MHz SMCLK)
+    ; Convert the ones digit to BCD
+    add #3, R14             ; Add 3 (to adjust for binary to BCD conversion)
+    daa                     ; Decimal adjust after addition
 
-            mov.w #TA0CCTL0, R8 ; Load the address of Timer A0 CCTL0 register
-            mov.w #CCIE, 0(R8) ; Enable Timer A0 CCR0 interrupt
+    ; Convert the tens digit to BCD
+    add #3, R13             ; Add 3 (to adjust for binary to BCD conversion)
+    daa                     ; Decimal adjust after addition
 
-            ; Enable global interrupts
-            EINT
+    ; Result is in R13 (tens digit) and R14 (ones digit)
+    ret
 
-            ; Infinite loop
-MainLoop    jmp MainLoop
 
-; Timer A0 CCR0 interrupt service routine
-.sect "int09"
-.short TISR
+TISR
+    ; Timer Interrupt Service Routine
 
-TISR        ; Interrupt service routine code goes here
+    ; Increment centiseconds
+    inc @seconds
 
-            ; For demonstration purposes, toggle an output on every interrupt
-            XOR.B #1, 0(R4) ; Toggle the least significant bit of the display port
+    ; Check if centiseconds reached 100
+    cmp #100d, @seconds
+    jl notReached100
 
-            RETI ; Return from interrupt
+    ; Centiseconds reached 100, reset to 0 and increment seconds
+    clr @seconds
+    inc @centiseconds
+
+notReached100
+    ; Convert centiseconds to BCD and display
+    mov @centiseconds, R12
+    call BCDConversion
+    mov #array, R5
+    add R13, R5              ; Add the BCD result for tens digit to array
+    mov #1d, &P2OUT          ; Set the appropriate port value for display
+    mov R5, &P1OUT          ; Display the value
+
+    ; ... Repeat the process for ones digit
+    mov.w R8, R12           ; Copy the binary input to R12 (ones digit)
+
+    ; Convert the ones digit to BCD
+    add #3, R12             ; Add 3 (to adjust for binary to BCD conversion)
+    daa                     ; Decimal adjust after addition
+
+    ; Save the BCD result of the ones digit
+    mov R12, @R15           ; Store the result in memory or register (adjust R15 as needed)
+    
+    ; Clear interrupt flag and enable the next interrupt
+    bis #00001h, &TA0CCTL0
+
+    ret
